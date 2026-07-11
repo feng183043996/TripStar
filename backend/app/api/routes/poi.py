@@ -130,3 +130,44 @@ async def get_attraction_photo(name: str, city: Optional[str] = None):
             detail=f"获取景点图片失败: {str(e)}"
         )
 
+
+
+
+@router.get(
+    "/photo/proxy",
+    summary="代理景点图片",
+    description="代理下载小红书CDN图片，绕过防盗链(CORS/Referer)"
+)
+async def proxy_attraction_photo(url: str):
+    """
+    代理下载外部图片，解决小红书CDN防盗链导致前端403的问题。
+    后端以正确的Referer请求CDN，将图片字节流直传给前端。
+    """
+    import httpx as _httpx
+    from fastapi.responses import Response as _Response
+
+    try:
+        async with _httpx.AsyncClient(follow_redirects=True) as client:
+            resp = await client.get(
+                url,
+                headers={
+                    "Referer": "https://www.xiaohongshu.com/",
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/124.0.0.0 Safari/537.36"
+                    ),
+                },
+                timeout=12,
+            )
+            if resp.status_code == 200:
+                content_type = resp.headers.get("content-type", "image/jpeg")
+                return _Response(
+                    content=resp.content,
+                    media_type=content_type,
+                    headers={"Cache-Control": "public, max-age=86400"},
+                )
+            return _Response(status_code=resp.status_code, content=b"")
+    except Exception as e:
+        print(f"图片代理失败: {e}")
+        return _Response(status_code=502, content=b"")
