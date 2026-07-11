@@ -49,7 +49,7 @@ const { t } = useI18n()
 </script>
 
 <style scoped lang="scss">
-@import url("https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz@6..12&family=Raleway:wght@700&display=swap");
+@import url("https://fonts.loli.net/css2?family=Nunito+Sans:opsz@6..12&family=Raleway:wght@700&display=swap");
 * {
   margin: 0;
   padding: 0;
