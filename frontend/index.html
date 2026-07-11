@@ -15,8 +15,10 @@
 <body>
   <div id="app"></div>
   <script type="text/javascript">
-    window._AMapSecurityConfig = {
-      securityJsCode: 'your_vite_amap_web_js_security_key'
+    // 高德地图 JS API 2.0 安全密钥：构建时由 VITE_AMAP_WEB_JS_SECURITY_KEY 注入
+    const _amapSecKey = '%VITE_AMAP_WEB_JS_SECURITY_KEY%';
+    if (_amapSecKey) {
+      window._AMapSecurityConfig = { securityJsCode: _amapSecKey };
     }
   </script>
   <script type="module" src="/src/main.ts"></script>
