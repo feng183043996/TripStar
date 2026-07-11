@@ -73,7 +73,10 @@ class Settings(BaseSettings):
 
 # 创建全局配置实例
 settings = Settings()
-_RUNTIME_SETTINGS_FILE = Path(__file__).resolve().parent.parent / "runtime_settings.json"
+
+# runtime_settings.json 存放在 data/ 目录（已挂载 volume），容器重建后不丢失
+_RUNTIME_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+_RUNTIME_SETTINGS_FILE = _RUNTIME_DATA_DIR / "runtime_settings.json"
 _RUNTIME_SETTING_KEYS = {
     "vite_amap_web_key",
     "vite_amap_web_js_key",
@@ -84,6 +87,13 @@ _RUNTIME_SETTING_KEYS = {
     "openai_base_url",
     "openai_model",
 }
+
+# 环境变量优先级标记：记录哪些 key 有环境变量作为 fallback
+_ENV_BACKED_KEYS: Dict[str, str] = {}
+for _key in _RUNTIME_SETTING_KEYS:
+    _env_val = os.environ.get(_key, "")
+    if _env_val:
+        _ENV_BACKED_KEYS[_key] = _env_val
 
 
 def _load_runtime_overrides() -> Dict[str, Any]:
@@ -102,7 +112,7 @@ def _load_runtime_overrides() -> Dict[str, Any]:
 
 def _persist_runtime_overrides(overrides: Dict[str, Any]) -> None:
     """持久化运行时配置覆盖项。"""
-    _RUNTIME_SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _RUNTIME_DATA_DIR.mkdir(parents=True, exist_ok=True)
     with open(_RUNTIME_SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(overrides, f, ensure_ascii=False, indent=2)
 
@@ -121,10 +131,18 @@ def _sync_env_from_settings() -> None:
 
 
 def _apply_runtime_overrides(overrides: Dict[str, Any]) -> None:
-    """将覆盖项应用到全局 settings 实例。"""
+    """将覆盖项应用到全局 settings 实例。
+    
+    空值不会覆盖有环境变量 fallback 的 key，防止 UI 误操作清空配置。
+    """
     for key, value in overrides.items():
-        if key in _RUNTIME_SETTING_KEYS and hasattr(settings, key):
-            setattr(settings, key, value if value is not None else "")
+        if key not in _RUNTIME_SETTING_KEYS or not hasattr(settings, key):
+            continue
+        # 如果覆盖值为空字符串，且该 key 有环境变量兜底，则跳过（保留环境变量值）
+        if value == "" and key in _ENV_BACKED_KEYS:
+            print(f"⚙️  {key}: runtime_settings 为空，保留环境变量值")
+            continue
+        setattr(settings, key, value if value is not None else "")
     _sync_env_from_settings()
 
 
@@ -208,4 +226,3 @@ def print_config():
     print(f"LLM Base URL: {llm_base_url}")
     print(f"LLM Model: {llm_model}")
     print(f"日志级别: {settings.log_level}")
-
